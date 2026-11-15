@@ -1,0 +1,25 @@
+[project]
+name = "robot-brain-pi"
+version = "0.1.0"
+description = "Raspberry Pi onboard runtime for the dual-brain desktop biped (policy runner + USB link to ESP32-P4)"
+requires-python = ">=3.11"
+dependencies = [
+    "pyserial>=3.5",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Needed only to run a policy.onnx bundle. Not needed for neutral_hold / manual_jog.
+onnx = ["onnxruntime>=1.18", "numpy>=1.26"]
+
+[project.scripts]
+robot-brain = "cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["cli", "policy_runner", "usb_client", "fovea_agent"]
+packages = ["generated"]

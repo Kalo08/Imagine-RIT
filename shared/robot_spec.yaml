@@ -1,0 +1,83 @@
+# =============================================================================
+# robot_spec.yaml  --  SINGLE SOURCE OF TRUTH for the robot's joint layout.
+#
+# The CAD is not final, so the number of joints N is NOT hard-coded anywhere.
+# Everything (wire packet sizes, C structs, Python dataclasses, safety loops,
+# reflex offset tables, the policy-manifest check) derives from the `joints:`
+# list below.
+#
+#   To add / remove / reorder a joint:
+#     1. edit the `joints:` list (and `reflexes.*.offsets_rad` if needed)
+#     2. run `make generate`      (or: python shared/generate_bindings.py)
+#     3. rebuild + reflash the ESP32-P4, restart the Pi runtime
+#
+# ORDER MATTERS: list order == index in every packet == joint order the
+# policy.onnx must use.  Changing it invalidates any previously trained policy
+# (the runtime refuses to load a manifest whose joint_names differ).
+#
+# The joints below are a PLACEHOLDER 6-joint sample (2 neck + 4 body).
+# =============================================================================
+spec_version: 1
+robot_name: desktop_biped_sample
+
+control:
+  state_hz: 200            # ESP32-P4 -> Pi StatePacket rate (also the Core-1 loop rate)
+  action_hz: 50            # Pi -> ESP32-P4 ActionPacket rate (policy loop rate)
+  action_timeout_ms: 100   # no valid ActionPacket for this long => ESP holds neutral
+
+bus:
+  driver: feetech_sts      # feetech_sts | dynamixel_x   (selects servo_bus driver)
+  baud: 1000000
+
+# Per-joint fields:
+#   name            unique C/Python identifier
+#   id              servo ID on the daisy chain (unique, 0..252)
+#   role            neck | hip | knee | ankle | other     ("neck" joints are driven
+#                   by foveated gaze tracking unless the Pi sets gaze_override)
+#   gaze_axis       (neck only) yaw | pitch : which image axis this joint tracks
+#   min_rad/max_rad HARD limits, enforced last on the ESP32-P4 (cannot be bypassed)
+#   neutral_rad     pose used for NEUTRAL_HOLD and as policy action origin
+#   max_current_ma  hard over-current limit (sustained => target is clamped)
+#   max_vel_rad_s   slew limit applied to commanded targets (reflex offsets bypass it)
+joints:
+  - {name: neck_yaw,      id: 1, role: neck,  gaze_axis: yaw,   min_rad: -1.20, max_rad: 1.20, neutral_rad: 0.0, max_current_ma: 500, max_vel_rad_s: 6.0}
+  - {name: neck_pitch,    id: 2, role: neck,  gaze_axis: pitch, min_rad: -0.60, max_rad: 0.60, neutral_rad: 0.0, max_current_ma: 500, max_vel_rad_s: 6.0}
+  - {name: l_hip_pitch,   id: 3, role: hip,   min_rad: -0.90, max_rad: 0.90, neutral_rad: 0.0, max_current_ma: 900, max_vel_rad_s: 5.0}
+  - {name: r_hip_pitch,   id: 4, role: hip,   min_rad: -0.90, max_rad: 0.90, neutral_rad: 0.0, max_current_ma: 900, max_vel_rad_s: 5.0}
+  - {name: l_ankle_pitch, id: 5, role: ankle, min_rad: -0.60, max_rad: 0.60, neutral_rad: 0.0, max_current_ma: 700, max_vel_rad_s: 8.0}
+  - {name: r_ankle_pitch, id: 6, role: ankle, min_rad: -0.60, max_rad: 0.60, neutral_rad: 0.0, max_current_ma: 700, max_vel_rad_s: 8.0}
+
+# Hard safety behaviour (ESP32-P4 Core 1, spinal_reflex component).
+safety:
+  overcurrent_trip_ms: 30      # |current| > max_current_ma for this long => clamp joint
+  overcurrent_release: 0.80    # ...released once |current| < release * max_current_ma
+  imu_stale_ms: 50             # IMU data older than this disables IMU-driven reflexes
+
+# Spinal reflexes: sub-10 ms, run on the ESP32-P4 and add temporary offsets on
+# top of whatever the Pi commanded.  `offsets_rad` is keyed by joint name; joints
+# not listed get 0.  Envelope: instant attack -> hold_ms -> linear release_ms.
+reflexes:
+  looming_flinch:              # triggered by the vision core when an object expands fast
+    hold_ms: 120
+    release_ms: 200
+    offsets_rad: {neck_pitch: -0.25, l_hip_pitch: 0.10, r_hip_pitch: 0.10}
+  ankle_brace:                 # triggered by any ankle-role current spike, gyro spike or tilt
+    hold_ms: 150
+    release_ms: 250
+    current_spike_ma: 250      # per-tick (1/state_hz) |current| jump on an ankle joint
+    gyro_rad_s: 3.0            # |gyro| magnitude
+    tilt_deg: 25.0             # angle between body-up and world-up
+    offsets_rad: {l_ankle_pitch: 0.12, r_ankle_pitch: 0.12}
+
+# Foveated gaze tracker -> neck PID (foveated_vision component, Core 0).
+gaze:
+  hfov_rad: 1.75               # camera horizontal field of view
+  vfov_rad: 1.31               # camera vertical field of view
+  yaw_sign: 1.0                # flip if the neck turns away from the target
+  pitch_sign: 1.0
+  kp: 0.60
+  ki: 0.00
+  kd: 0.02
+  lock_threshold: 0.12         # |normalised image error| below this counts as "on target"
+  lock_frames: 6               # ...for this many consecutive frames => locked
+  min_confidence: 0.35

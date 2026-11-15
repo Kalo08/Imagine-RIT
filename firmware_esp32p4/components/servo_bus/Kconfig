@@ -1,0 +1,20 @@
+menu "Servo bus (half-duplex TTL)"
+    config SERVO_BUS_UART_NUM
+        int "UART port"
+        default 1
+    config SERVO_BUS_TX_GPIO
+        int "UART TX GPIO (to buffer input)"
+        default 22
+        help
+          PLACEHOLDER pin: set to the header pin you wire on the ESP32-P4-NANO.
+    config SERVO_BUS_RX_GPIO
+        int "UART RX GPIO (from buffer output)"
+        default 21
+        help
+          PLACEHOLDER pin: set to your wiring.
+    config SERVO_BUS_DIR_GPIO
+        int "Direction GPIO (UART RTS -> tri-state buffer enable)"
+        default 20
+        help
+          PLACEHOLDER pin: set to your wiring. Driven high while transmitting.
+endmenu

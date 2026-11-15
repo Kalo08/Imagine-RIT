@@ -1,0 +1,90 @@
+# =============================================================================
+# protocol.yaml -- wire protocol between ESP32-P4 and Raspberry Pi.
+#
+# Transport: USB 2.0 HS CDC-ACM byte stream.  All multi-byte values are
+# LITTLE-ENDIAN, structs are PACKED (no padding).  Array counts may reference
+# NUM_JOINTS (from robot_spec.yaml) or an entry in `constants`, so packet sizes
+# change automatically when the joint list changes.
+#
+# Frame on the wire:
+#     +--------+----------+-------------+-----------+----------+
+#     | magic  | msg_type | payload_len | payload   | crc16    |
+#     | u16 LE | u8       | u16 LE      | N bytes   | u16 LE   |
+#     +--------+----------+-------------+-----------+----------+
+#   magic = 0xA55A (bytes 5A A5).  CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF,
+#   no reflection, no xorout) over msg_type + payload_len + payload.
+#   Receivers resync by scanning for magic; a frame whose payload_len does not
+#   equal the size this build expects for msg_type is rejected (this is what
+#   catches a Pi and ESP32 built from different NUM_JOINTS).
+#
+# Field `type` is a scalar (u8 u16 u32 u64 i8 i16 i32 f32 f64) or a struct name.
+# `count` makes a fixed-size array.  An array of u8 is exposed as `bytes` in Python.
+# =============================================================================
+protocol_version: 1
+
+framing:
+  magic: 0xA55A
+  crc: {algo: "CRC-16/CCITT-FALSE", poly: 0x1021, init: 0xFFFF}
+
+constants:
+  ROI_W: 64          # foveated crop streamed to the Pi (gray8)
+  ROI_H: 64
+
+enums:
+  ControlMode:
+    flags: false
+    values:
+      NEUTRAL_HOLD: 0   # ignore targets, hold neutral pose (neck still tracks gaze)
+      ONNX_POLICY: 1    # follow Pi-supplied target_pos_rad (policy output OR manual jog)
+      ESTOP: 2          # torque OFF (limp). LATCHED on the ESP until the Pi sends NEUTRAL_HOLD (explicit re-arm)
+  ReflexBit:
+    flags: true         # bit positions -> StatePacket.reflex_mask
+    values:
+      LOOMING_FLINCH: 0
+      ANKLE_BRACE: 1
+      OVERCURRENT_CLAMP: 2
+      LIMIT_CLAMP: 3     # a target was out of range / non-finite and was clamped
+      WATCHDOG_HOLD: 4   # Pi link silent > action_timeout_ms => holding neutral
+      IMU_STALE: 5
+      SERVO_FAULT: 6     # at least one servo failed to answer this tick
+
+structs:
+  JointState:
+    - {name: pos_rad,    type: f32}
+    - {name: vel_rad_s,  type: f32}
+    - {name: current_ma, type: i16}
+
+packets:
+  # ESP32-P4 -> Pi @ state_hz (200 Hz)
+  StatePacket:
+    msg_type: 1
+    fields:
+      - {name: timestamp_us,        type: u64}             # esp_timer since boot
+      - {name: ack_sequence_id,     type: u32}             # last ActionPacket.sequence_id accepted
+      - {name: active_mode,         type: u8}              # ControlMode actually applied
+      - {name: quat_wxyz,           type: f32, count: 4, default: [1.0, 0.0, 0.0, 0.0]}
+      - {name: gyro_rad_s,          type: f32, count: 3}
+      - {name: joints,              type: JointState, count: NUM_JOINTS}
+      - {name: reflex_mask,         type: u16}             # ReflexBit bitmask
+      - {name: gaze_x,              type: f32}             # normalised image coords, -1..1
+      - {name: gaze_y,              type: f32}
+      - {name: gaze_confidence,     type: f32}             # 0..1
+      - {name: gaze_locked,         type: u8}              # 1 while fovea is locked on target
+
+  # Pi -> ESP32-P4 @ action_hz (50 Hz)
+  ActionPacket:
+    msg_type: 2
+    fields:
+      - {name: sequence_id,         type: u32}
+      - {name: control_mode,        type: u8}              # ControlMode
+      - {name: gaze_override,       type: u8}              # 1 => Pi drives neck joints, ESP tracking off
+      - {name: target_pos_rad,      type: f32, count: NUM_JOINTS}
+
+  # ESP32-P4 -> Pi @ ~10 Hz: gray8 crop around the gaze target (fovea).
+  RoiFrame:
+    msg_type: 3
+    fields:
+      - {name: timestamp_us,        type: u64}
+      - {name: center_x,            type: f32}             # normalised, same frame as gaze_x/y
+      - {name: center_y,            type: f32}
+      - {name: pixels,              type: u8, count: "ROI_W*ROI_H"}
