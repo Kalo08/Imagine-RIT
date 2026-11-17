@@ -1,0 +1,15 @@
+menu "Camera (MIPI-CSI via esp_video)"
+    config CAMERA_SCCB_I2C_PORT
+        int "SCCB (sensor control) I2C port"
+        default 1
+    config CAMERA_SCCB_SCL_GPIO
+        int "SCCB SCL GPIO"
+        default 8
+        help
+          PLACEHOLDER: set to the camera connector's SCCB pins on your board.
+    config CAMERA_SCCB_SDA_GPIO
+        int "SCCB SDA GPIO"
+        default 7
+        help
+          PLACEHOLDER: set to the camera connector's SCCB pins on your board.
+endmenu

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+brain_pi/.venv/
+brain_pi/uv.lock
+*.egg-info/
+firmware_esp32p4/build/
+firmware_esp32p4/sdkconfig
+firmware_esp32p4/sdkconfig.old
+firmware_esp32p4/managed_components/
+firmware_esp32p4/dependencies.lock

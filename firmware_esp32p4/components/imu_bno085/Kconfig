@@ -1,0 +1,24 @@
+menu "BNO085 IMU (I2C)"
+    config IMU_BNO085_I2C_PORT
+        int "I2C port"
+        default 0
+    config IMU_BNO085_I2C_ADDR
+        hex "7-bit I2C address (0x4A, or 0x4B with DI pin high)"
+        default 0x4A
+    config IMU_BNO085_SDA_GPIO
+        int "SDA GPIO"
+        default 7
+        help
+          PLACEHOLDER pin: set to your wiring.
+    config IMU_BNO085_SCL_GPIO
+        int "SCL GPIO"
+        default 8
+        help
+          PLACEHOLDER pin: set to your wiring.
+    config IMU_BNO085_INT_GPIO
+        int "INT GPIO (active low, data ready)"
+        default 5
+    config IMU_BNO085_RST_GPIO
+        int "RST GPIO"
+        default 6
+endmenu
