@@ -1,8 +1,19 @@
 # Dual-Brain Desktop Biped
 
-Hardware, firmware and onboard runtime for an original two-legged desktop robot with a
-**two-processor nervous system**: an ESP32-P4 handles fast reflexes, vision and display, while a
-Raspberry Pi runs the high-level policy loop.
+Firmware and onboard software for a small two-legged robot. An ESP32-P4 chip handles fast reflexes, vision and the screen. A Raspberry Pi runs the slower decision loop.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/hero-light.svg">
+    <img src="docs/screenshots/hero-dark.svg" alt="A pixel-art robot next to three boxes: the Pi runs the policy loop at 50 Hz, USB carries checked binary frames, and the ESP32-P4 runs reflexes and safety at 200 Hz." width="100%">
+  </picture>
+</p>
+
+**Why it exists:** a walking robot needs split-second safety and reflexes that cannot wait for a network round trip, and a flexible place to run a learned policy. This design gives each its own processor.
+
+**Who it's for:** builders of the robot and the teammate who trains its policy. You can drop in a trained `policy.onnx` and test everything else on a laptop with no hardware.
+
+**Try it in one minute:** run `python tools/bench_test.py` (see [Quick start](#quick-start-no-hardware)).
 
 > **Status:** the Pi runtime, protocol generator and simulator are tested and working.
 > The ESP32-P4 firmware is written but **has not yet been compiled or run on hardware**.

@@ -1,3 +1,10 @@
+# Local Claude Code skills/settings and the skills lockfile
+.claude/
+skills-lock.json
+# Browser-automation session artifacts
+.playwright-mcp/
+.playwright-cli/
+
 # Editor config can embed absolute local paths (e.g. your Windows username)
 .vscode/
 __pycache__/
